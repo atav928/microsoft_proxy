@@ -3,14 +3,17 @@
 function FindProxyForURL(url, host)
 {
     var direct = "DIRECT";
-    var proxyServer = "PROXY http://proxy-sav.gac.gulfaero.com:8080; http://proxy-atl.gac.gulfaero.com:8080; direct";
+    var proxyServer = "PROXY 10.10.10.10:8080";
 
 
 
+    if(shExpMatch(host, "*-files.sharepoint.com")
+        || shExpMatch(host, "*-myfiles.sharepoint.com"))
+    {
+        return proxyServer;
+    }
 
-
-    if(shExpMatch(host, "gulfaero-my.sharepoint.com")
-        || shExpMatch(host, "gulfaero.sharepoint.com")
+    if(shExpMatch(host, "*.sharepoint.com")
         || shExpMatch(host, "outlook.office.com")
         || shExpMatch(host, "outlook.office365.com"))
     {

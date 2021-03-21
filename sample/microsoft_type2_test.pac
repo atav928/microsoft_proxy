@@ -3,11 +3,13 @@
 function FindProxyForURL(url, host)
 {
     var direct = "DIRECT";
-    var proxyServer = "PROXY http://proxy-sav.gac.gulfaero.com:8080; http://proxy-atl.gac.gulfaero.com:8080; direct";
+    var proxyServer = "PROXY 10.10.10.10:8080";
 
 
 
-    if(shExpMatch(host, "excelcs.officeapps.live.com")
+    if(shExpMatch(host, "*-files.sharepoint.com")
+        || shExpMatch(host, "*-myfiles.sharepoint.com")
+        || shExpMatch(host, "excelcs.officeapps.live.com")
         || shExpMatch(host, "ocws.officeapps.live.com")
         || shExpMatch(host, "odc.officeapps.live.com")
         || shExpMatch(host, "pptcs.officeapps.live.com")
@@ -32,6 +34,7 @@ function FindProxyForURL(url, host)
         || shExpMatch(host, "*.protection.office.com")
         || shExpMatch(host, "*.protection.outlook.com")
         || shExpMatch(host, "*.security.microsoft.com")
+        || shExpMatch(host, "*.sharepoint.com")
         || shExpMatch(host, "*.skypeforbusiness.com")
         || shExpMatch(host, "*.teams.microsoft.com")
         || shExpMatch(host, "account.activedirectory.windowsazure.com")
@@ -49,8 +52,6 @@ function FindProxyForURL(url, host)
         || shExpMatch(host, "device.login.microsoftonline.com")
         || shExpMatch(host, "graph.microsoft.com")
         || shExpMatch(host, "graph.windows.net")
-        || shExpMatch(host, "gulfaero-my.sharepoint.com")
-        || shExpMatch(host, "gulfaero.sharepoint.com")
         || shExpMatch(host, "home.office.com")
         || shExpMatch(host, "login-us.microsoftonline.com")
         || shExpMatch(host, "login.microsoft.com")

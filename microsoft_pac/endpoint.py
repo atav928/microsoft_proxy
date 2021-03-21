@@ -13,6 +13,7 @@ class MicrosoftPac(object):
     def __init__(self, instance = 'Worldwide', required=True, tenant=None, category=0, verbose=False):
         self.verbose = verbose
         self.tenant = tenant
+        self.service_set = ['Exchange', 'Skype', 'SharePoint', 'Common']
         if self.verbose:
             print("VERBOSE:\tRetrieving Microsoft Endpoint information")
         self.endpoints = self.get_services(instance)
@@ -51,9 +52,9 @@ class MicrosoftPac(object):
         service_set = ['Exchange', 'Skype', 'SharePoint', 'Common']
         categories = ['Default', 'Allow', 'Optimize']
         webtraffic = ['80', '80,443', '443']
-        # figure out how to split out udp ports special tcp and 80/443
-        service_dict = {key: {c: {'urls': [], 'ips': []} for c in categories} for key in service_set}
-        #service_dict = {key: {c: {'urls': [], 'ips': {}} for c in categories} for key in service_set}
+        # split out udp ports special tcp and 80/443
+        #service_dict = {key: {c: {'urls': [], 'ips': []} for c in categories} for key in service_set}
+        service_dict = {key: {c: {'urls': [], 'ips': {'tcpPorts': {'webtraffic': []}, 'udpPorts': {}}} for c in categories} for key in service_set}
 
 
         if self.required == False:
@@ -68,14 +69,26 @@ class MicrosoftPac(object):
                     #    if i.get('urls') != None:
                     #        for url in i.get('urls'):
                     #            service_dict[i.get('serviceArea')].append(url) 
-                    if i.get('urls') != None:
+                    if i.get('urls', None) != None:
                         for url in i.get('urls'):
                             service_dict[i.get('serviceArea')][i.get('category', 'Default')]['urls'].append(url)
-                    if i.get('ips') != None:
-                        if i.get('tcpPorts', 'None') in webtraffic:
+                    if i.get('ips', None) != None:
+                        # Extract TCP Ports For Standard WebTraffic
+                        if i.get('tcpPorts', None) in webtraffic and i.get('tcpPorts', None) != None:
                             for ips in i.get('ips'):
-                                service_dict[i.get('serviceArea')][i.get('category', 'Default')]['ips'].append(ips)
-                                #service_dict[i.get('serviceArea')][i.get('category', 'Default')]['ips'].update({})
+                                service_dict[i.get('serviceArea')][i.get('category', 'Default')]['ips']['tcpPorts']['webtraffic'].append(ips)
+                        # Else Extract Other TCP Ports Needed
+                        elif i.get('tcpPorts', None) != None and i.get('tcpPorts') not in webtraffic:
+                            if service_dict[i.get('serviceArea')][i.get('category', 'Default')]['ips']['tcpPorts'].get(i.get('tcpPorts', None)) == None:
+                                service_dict[i.get('serviceArea')][i.get('category', 'Default')]['ips']['tcpPorts'].update({i.get('tcpPorts'): []})
+                            for ips in i.get('ips'):
+                                service_dict[i.get('serviceArea')][i.get('category', 'Default')]['ips']['tcpPorts'][i.get('tcpPorts')].append(ips)
+                        # Search for special UDP Port Requirements
+                        if i.get('udpPorts', None) != None:
+                            if service_dict[i.get('serviceArea')][i.get('category', 'Default')]['ips']['udpPorts'].get(i.get('udpPorts', None)) == None:
+                                service_dict[i.get('serviceArea')][i.get('category', 'Default')]['ips']['udpPorts'].update({i.get('udpPorts'): []})
+                            for ips in i.get('ips'):
+                                service_dict[i.get('serviceArea')][i.get('category', 'Default')]['ips']['udpPorts'][i.get('udpPorts')].append(ips)                            
         
         #if self.tenant:
         #    # Movies *.sharepoint.com into 'Default' placing tenant traffic in 'Optimize'
@@ -100,27 +113,39 @@ class MicrosoftPac(object):
         IP_Address,Name,Description
         """
         service_set = ['Exchange', 'Skype', 'SharePoint', 'Common']
-        allow_list = {key: [] for key in service_set}
-        optimize_list = {key: [] for key in service_set}
-        default_list = {key: [] for key in service_set}
+        header = ['IP_ADDRESS','NAME','DESCRIPTION']
+        allow_list = {key: [header] for key in service_set}
+        optimize_list = {key: [header] for key in service_set}
+        default_list = {key: [header] for key in service_set}
         list_of_lists = {'Allow': allow_list, 'Optimize': optimize_list, 'Default': default_list}
 
         for service in service_set:
             for category, listname in list_of_lists.items():
-                for ip_addr in self.endpoints_breakdown[service][category]['ips']:
-                        list_of_lists[category][service].append([ip_addr, f"Azure_{service}_{category}_", "Description here"])
+                #for ip_addr in self.endpoints_breakdown[service][category]['ips']:
+                #        list_of_lists[category][service].append([ip_addr, f"Azure_{service}_{category}_", "Description here"])
+                for ports, ip_addr in self.endpoints_breakdown[service][category]['ips']['tcpPorts'].items():
+                    if ip_addr:
+                        for ip in ip_addr:
+                            list_of_lists[category][service].append([ip, f"Azure_{service}_{category}_", f"Microsoft {service} {category} TCP {ports}"])
+                for ports, ip_addr in self.endpoints_breakdown[service][category]['ips']['udpPorts'].items():
+                    if ip_addr:
+                        for ip in ip_addr:
+                            list_of_lists[category][service].append([ip, f"Azure_{service}_{category}_", f"Microsoft {service} {category} UDP {ports}"])
 
         self.allow_list = allow_list
         self.optimize_list = optimize_list
         self.default_list = default_list
 
 
-    def create_pac_file(self):
+    def create_pac_file(self, proxy='10.10.10.10:8080'):
         pac_file = [
             "// This PAC file will provide proxy config to Microsoft 365 services",
             "//  using data from the public web service for all endpoints",
             "function FindProxyForURL(url, host)",
             "{",
+            "\tvar direct = \"DIRECT\";",
+            f"\tvar proxyServer = \"PROXY {proxy}\";",
+            ""
         ]
         service_set = ['Exchange', 'Skype', 'SharePoint', 'Common']
         categories = ['Default', 'Allow', 'Optimize']
@@ -140,6 +165,7 @@ class MicrosoftPac(object):
         pac_file.append("\t{")
         pac_file.append("\t\treturn DIRECT;")
         pac_file.append("\t}")
+        pac_file.append("\n\treturn proxyServer;\n")
         pac_file.append("}")
 
         self.pac_file = pac_file
