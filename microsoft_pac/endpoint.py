@@ -151,9 +151,25 @@ class MicrosoftPac(object):
         categories = {
             0: ['Default', 'Allow', 'Optimize'],
             1: ['Optimize'],
-            2: ['Allow', 'Optimize']
+            2: ['Allow', 'Optimize'], 
+            3: ['Allow', 'Optimize'] # sets default to be decrypted
         }
         #categories = ['Default', 'Allow', 'Optimize']
+
+        tmp_array = []
+        if category_type == 3:
+            for service in service_set:
+                for url in self.endpoints_breakdown[service]['Default']['urls']:
+                    tmp_array.append(f"(host, \"{url}\")\t\t//Default")
+            for i in range(len(tmp_array)):
+                if i == 0:
+                    pac_file.append(f"\tif(shExpMatch{tmp_array[i]}")
+                else:
+                    pac_file.append(f"\t\t|| shExpMatch{tmp_array[i]}")
+            pac_file.append("\t\t)")
+            pac_file.append("\t{")
+            pac_file.append("\t\treturn proxyServer;")
+            pac_file.append("\t}\n")
 
         tmp_array = []
         for service in service_set:
