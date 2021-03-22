@@ -113,7 +113,7 @@ class MicrosoftPac(object):
         IP_Address,Name,Description
         """
         service_set = ['Exchange', 'Skype', 'SharePoint', 'Common']
-        header = ['IP_ADDRESS','NAME','DESCRIPTION']
+        header = ['IP_ADDRESS','NAME','DESCRIPTION','SERVICE','CATEGORY','PROTOCOL','PORT']
         allow_list = {key: [header] for key in service_set}
         optimize_list = {key: [header] for key in service_set}
         default_list = {key: [header] for key in service_set}
@@ -126,18 +126,18 @@ class MicrosoftPac(object):
                 for ports, ip_addr in self.endpoints_breakdown[service][category]['ips']['tcpPorts'].items():
                     if ip_addr:
                         for ip in ip_addr:
-                            list_of_lists[category][service].append([ip, f"Azure_{service}_{category}_", f"Microsoft {service} {category} TCP {ports}"])
+                            list_of_lists[category][service].append([ip, f"Azure_{service}_{category}_{ip}", f"Microsoft {service} {category} TCP {ports}", service, category, 'TCP', ports])
                 for ports, ip_addr in self.endpoints_breakdown[service][category]['ips']['udpPorts'].items():
                     if ip_addr:
                         for ip in ip_addr:
-                            list_of_lists[category][service].append([ip, f"Azure_{service}_{category}_", f"Microsoft {service} {category} UDP {ports}"])
+                            list_of_lists[category][service].append([ip, f"Azure_{service}_{category}_{ip}", f"Microsoft {service} {category} UDP {ports}", service, category, 'UDP', ports])
 
         self.allow_list = allow_list
         self.optimize_list = optimize_list
         self.default_list = default_list
 
 
-    def create_pac_file(self, proxy='10.10.10.10:8080'):
+    def create_pac_file(self, proxy='10.10.10.10:8080', category_type=2):
         pac_file = [
             "// This PAC file will provide proxy config to Microsoft 365 services",
             "//  using data from the public web service for all endpoints",
@@ -148,19 +148,24 @@ class MicrosoftPac(object):
             ""
         ]
         service_set = ['Exchange', 'Skype', 'SharePoint', 'Common']
-        categories = ['Default', 'Allow', 'Optimize']
+        categories = {
+            0: ['Default', 'Allow', 'Optimize'],
+            1: ['Optimize'],
+            2: ['Allow', 'Optimize']
+        }
+        #categories = ['Default', 'Allow', 'Optimize']
 
         tmp_array = []
         for service in service_set:
-            for category in categories:
+            for category in categories[category_type]:
                 for url in self.endpoints_breakdown[service][category]['urls']:
-                    tmp_array.append(f"host, \"{url}\"")
+                    tmp_array.append(f"(host, \"{url}\")\t\t//{category}")
 
         for i in range(len(tmp_array)):
             if i == 0:
-                pac_file.append(f"\tif(shExpMatch({tmp_array[i]})")
+                pac_file.append(f"\tif(shExpMatch{tmp_array[i]}")
             else:
-                pac_file.append(f"\t\t|| shExpMatch({tmp_array[i]})")
+                pac_file.append(f"\t\t|| shExpMatch{tmp_array[i]}")
         pac_file.append("\t\t)")
         pac_file.append("\t{")
         pac_file.append("\t\treturn DIRECT;")
